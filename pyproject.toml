@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "protonate-utils"
+version = "0.1.0"
+description = "Add hydrogens to ligands and proteins at a target pH."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { file = "LICENSE" }
+authors = [
+    { name = "Patrick Walters", email = "wpwalters@gmail.com" },
+]
+keywords = ["cheminformatics", "protonation", "hydrogens", "rdkit", "pdb"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering :: Chemistry",
+]
+
+# The two modes have independent dependencies and lazy imports, so the
+# base install pulls in nothing heavy. Install the extra(s) you need.
+dependencies = []
+
+[project.optional-dependencies]
+ligand = ["rdkit", "dimorphite-dl"]
+protein = ["biotite", "hydride", "numpy"]
+all = ["rdkit", "dimorphite-dl", "biotite", "hydride", "numpy"]
+
+[project.urls]
+Homepage = "https://github.com/PatWalters/protonate"
+
+[project.scripts]
+protonate-utils = "protonate_utils:main"
+
+[tool.setuptools]
+py-modules = ["protonate_utils"]
