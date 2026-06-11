@@ -84,22 +84,29 @@ def _pick_state(input_smiles, states):
     e.g. a secondary alkyl amide can come back as either NH or N-, and
     we'd silently flip between them on re-runs.
 
-    Prefer the state whose total formal charge is closest to the input
-    molecule's charge (with SMILES string as a deterministic tiebreak).
-    For groups with pKa far from the pH window dimorphite returns a
-    single state, so this only matters when dimorphite is unsure -- in
-    which case "match the input charge" is a sensible default.
+    When dimorphite is uncertain it returns both the ionized and the
+    neutral microstate (e.g. a primary amine comes back as both
+    ``CCC[NH3+]`` and ``CCCN``). Prefer the *most ionized* state -- the
+    one with the greatest total ionic character, measured as the sum of
+    |formal charge| over all atoms. This matches dimorphite's intent
+    (protonate bases, deprotonate acids) and, unlike "match the input
+    charge", does not collapse back to a neutral input that was simply
+    drawn without explicit charges. A zwitterion (net charge 0 but two
+    charged atoms) is correctly preferred over its neutral form. The
+    SMILES string is a deterministic tiebreak. For groups with pKa far
+    from the pH window dimorphite returns a single state, so the choice
+    only matters when dimorphite is unsure.
     """
     from rdkit import Chem
 
-    target = sum(
-        a.GetFormalCharge() for a in Chem.MolFromSmiles(input_smiles).GetAtoms()
-    )
-
     def score(smi):
         m = Chem.MolFromSmiles(smi)
-        charge = sum(a.GetFormalCharge() for a in m.GetAtoms()) if m else 10**6
-        return (abs(charge - target), smi)
+        ionic = (
+            sum(abs(a.GetFormalCharge()) for a in m.GetAtoms())
+            if m else -1
+        )
+        # Maximize ionic character (negate for min), then SMILES tiebreak.
+        return (-ionic, smi)
 
     return min(states, key=score)
 

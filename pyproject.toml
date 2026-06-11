@@ -28,6 +28,7 @@ dependencies = []
 ligand = ["rdkit", "dimorphite-dl"]
 protein = ["biotite", "hydride", "numpy"]
 all = ["rdkit", "dimorphite-dl", "biotite", "hydride", "numpy"]
+test = ["pytest", "rdkit", "dimorphite-dl"]
 
 [project.urls]
 Homepage = "https://github.com/PatWalters/protonate"
