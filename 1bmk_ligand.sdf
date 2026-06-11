@@ -1,0 +1,225 @@
+1BMK - prepared_ligand
+                    3D
+ Schrodinger Suite 2023-3.
+ 39 42  0  0  1  0            999 V2000
+    7.8948   10.9653   30.2806 F   0  0  0  0  0  0
+    6.0714   12.3722   30.8550 C   0  0  0  0  0  0
+    6.6858   11.4859   29.9743 C   0  0  0  0  0  0
+    6.0534   11.1160   28.7900 C   0  0  0  0  0  0
+    4.7842   11.6079   28.4973 C   0  0  0  0  0  0
+    4.1716   12.5115   29.3689 C   0  0  0  0  0  0
+    4.8175   12.8924   30.5488 C   0  0  0  0  0  0
+    1.4119    8.9579   30.1526 C   0  0  0  0  0  0
+    0.3904    8.4409   29.4209 N   0  0  0  0  0  0
+   -0.1565    9.2595   28.4900 C   0  0  0  0  0  0
+    0.2392   10.5283   28.2283 N   0  0  0  0  0  0
+    1.2417   11.0332   28.9942 C   0  0  0  0  0  0
+    1.8695   10.2612   29.9808 C   0  0  0  0  0  0
+   -1.2334    8.7739   27.7570 N   0  0  0  0  0  0
+    0.7629   13.5003   28.4094 N   0  0  0  0  0  0
+    1.6105   12.4696   28.8028 C   0  0  0  0  0  0
+    2.8476   13.1017   29.0269 C   0  0  0  0  0  0
+    2.7741   14.4022   28.8301 N   0  0  0  0  0  0
+    1.5415   14.6228   28.4832 C   0  0  0  0  0  0
+   -0.6781   13.5246   28.1192 C   0  0  0  0  0  0
+   -0.9753   14.2540   26.7909 C   0  0  0  0  0  0
+   -2.1593   13.8582   25.9469 C   0  0  0  0  0  0
+   -0.7466   13.5646   25.4751 C   0  0  0  0  0  0
+    6.5613   12.6541   31.7737 H   0  0  0  0  0  0
+    6.5417   10.4355   28.1111 H   0  0  0  0  0  0
+    4.2922   11.3090   27.5826 H   0  0  0  0  0  0
+    4.3467   13.5860   31.2304 H   0  0  0  0  0  0
+    1.8661    8.3140   30.8876 H   0  0  0  0  0  0
+    2.6589   10.6538   30.6027 H   0  0  0  0  0  0
+   -1.7071    9.3951   27.1185 H   0  0  0  0  0  0
+   -1.6623    7.9053   28.0469 H   0  0  0  0  0  0
+    1.1033   15.5828   28.2859 H   0  0  0  0  0  0
+   -1.1647   14.0460   28.9441 H   0  0  0  0  0  0
+   -1.0977   12.5253   28.1090 H   0  0  0  0  0  0
+   -0.7526   15.3186   26.8410 H   0  0  0  0  0  0
+   -2.7308   14.6453   25.4559 H   0  0  0  0  0  0
+   -2.7900   13.0314   26.2757 H   0  0  0  0  0  0
+   -0.3960   12.5324   25.4802 H   0  0  0  0  0  0
+   -0.3239   14.1487   24.6590 H   0  0  0  0  0  0
+  1  3  1  0  0  0
+  2  3  2  0  0  0
+  2  7  1  0  0  0
+  2 24  1  0  0  0
+  3  4  1  0  0  0
+  4  5  2  0  0  0
+  4 25  1  0  0  0
+  5  6  1  0  0  0
+  5 26  1  0  0  0
+  6  7  2  0  0  0
+  6 17  1  0  0  0
+  7 27  1  0  0  0
+  8  9  2  0  0  0
+  8 13  1  0  0  0
+  8 28  1  0  0  0
+  9 10  1  0  0  0
+ 10 11  2  0  0  0
+ 10 14  1  0  0  0
+ 11 12  1  0  0  0
+ 12 13  2  0  0  0
+ 12 16  1  0  0  0
+ 13 29  1  0  0  0
+ 14 30  1  0  0  0
+ 14 31  1  0  0  0
+ 15 16  1  0  0  0
+ 15 19  1  0  0  0
+ 15 20  1  0  0  0
+ 16 17  2  0  0  0
+ 17 18  1  0  0  0
+ 18 19  2  0  0  0
+ 19 32  1  0  0  0
+ 20 21  1  0  0  0
+ 20 33  1  0  0  0
+ 20 34  1  0  0  0
+ 21 22  1  0  0  0
+ 21 23  1  0  0  0
+ 21 35  1  0  0  0
+ 22 23  1  0  0  0
+ 22 36  1  0  0  0
+ 22 37  1  0  0  0
+ 23 38  1  0  0  0
+ 23 39  1  0  0  0
+M  END
+> <i_m_Source_File_Index>
+1
+
+> <i_pdb_PDB_CRYST1_z>
+4
+
+> <b_m_subgroup_collapsed>
+0
+
+> <b_ppw_created_disulfur>
+1
+
+> <b_ppw_prepared>
+1
+
+> <r_i_Bend_Energy-S-OPLS>
+766.810638735101
+
+> <r_i_Dihedral_Energy-S-OPLS>
+770.691858060123
+
+> <r_i_El-14_Energy-S-OPLS>
+547.868391758929
+
+> <r_i_Electrostatic_Energy-S-OPLS>
+-2125.67949294819
+
+> <r_i_LJ-14_Energy-S-OPLS>
+1733.05029530254
+
+> <r_i_Max_Derivative-S-OPLS>
+1.58264818501367
+
+> <r_i_Potential_Energy-S-OPLS>
+-1453.57780413415
+
+> <r_i_RMS_Derivative-S-OPLS>
+0.12409618192681
+
+> <r_i_Stretch_Energy-S-OPLS>
+155.291042053247
+
+> <r_i_Van_der_Waals_Energy-S-OPLS>
+-3444.93190072855
+
+> <r_i_target_temperature>
+298
+
+> <r_pdb_PDB_CRYST1_a>
+45.58
+
+> <r_pdb_PDB_CRYST1_alpha>
+90
+
+> <r_pdb_PDB_CRYST1_b>
+85.22
+
+> <r_pdb_PDB_CRYST1_beta>
+90
+
+> <r_pdb_PDB_CRYST1_c>
+123.5
+
+> <r_pdb_PDB_CRYST1_gamma>
+90
+
+> <r_pdb_PDB_EXPDTA_PH>
+7.4
+
+> <r_pdb_PDB_EXPDTA_TEMPERATURE>
+100
+
+> <r_pdb_PDB_R>
+0.189
+
+> <r_pdb_PDB_RESOLUTION>
+2.4
+
+> <r_pdb_PDB_Rfree>
+0.245
+
+> <r_ppw_preprocess_pH>
+7.4
+
+> <s_m_Source_File>
+proteinprep_39-out.maegz
+
+> <s_m_Source_Path>
+/Users/pwalters/maestro_runs/proteinprep_39
+
+> <s_m_entry_id>
+7
+
+> <s_m_entry_name>
+1bmk.1_ligand
+
+> <s_m_job_name>
+proteinprep_39
+
+> <s_m_subgroup_title>
+proteinprep_39-out->1BMK - prepared_split_by_structure
+
+> <s_m_subgroupid>
+proteinprep_39-out->1BMK - prepared_split_by_structure
+
+> <s_pdb_PDB_CLASSIFICATION>
+TRANSFERASE
+
+> <s_pdb_PDB_CRYST1_Space_Group>
+P 21 21 21
+
+> <s_pdb_PDB_DEPOSITION_DATE>
+23-JUL-98
+
+> <s_pdb_PDB_EXPDTA>
+X-RAY DIFFRACTION
+
+> <s_pdb_PDB_ID>
+1BMK
+
+> <s_pdb_PDB_REMARK_350_Biomolecule_1_Transform_1_Chains>
+A
+
+> <s_pdb_PDB_REMARK_350_Biomolecule_1_Transform_1_Matrix_1>
+1.000000 0.000000 0.000000   0.000000;0.000000 1.000000 0.000000   0.000000;0.000000 0.000000 1.000000   0.000000
+
+> <s_pdb_PDB_TITLE>
+THE COMPLEX STRUCTURE OF THE MAP KINASE P38/SB218655
+
+> <s_pdb_PDB_format_version>
+3.30
+
+> <s_ppw_het_states>
+eJztkzFuwzAMRa9ieDYCkRETuVcJMnRIJiNLkcnI3SuJcZ4F9AaVB+PrC9AXH8V1lPFruORP0zFOQ7hOQ5GGPCHPyIScPzIGpCAVeUSSFkmLpEXSImmRNCPNSDPSjDQjzUizmlb0u3wvV4Dghu6NUqTAxrEIhByOwskRCbT8DN0bxqGFnEPTxuBida+yFLA6UW0MLlb3KmiBuR+qjcFNY/rTKHxbY3ePTy1Ki7w7QqP8DKVH3h6hU96k1qB8M4zshMPJQg5exzk/5bJKOWQU2VZaVum9CvNrGh7PZdn+9+/l51afQB+BPgJ9BPoI9BH4ryNwff0CvIHmkw==
+
+> <s_ppw_prepared_with_version>
+2023-3
+
+$$$$
