@@ -20,7 +20,7 @@ specialist tool for each case behind one consistent interface, so you don't
 have to remember two separate workflows:
 
 - **Ligands** use [Dimorphite-DL](https://github.com/durrantlab/dimorphite_dl)
-  for pH-aware protonation states and [RDKit](https://www.rdkit.org/) for
+  for pH-aware protonation states and [the RDKit](https://www.rdkit.org/) for
   structure handling. When the input has 3D coordinates, the heavy-atom
   geometry is preserved exactly — only the newly added hydrogens are given
   computed positions.
@@ -185,7 +185,7 @@ prepare_structure("input.pdb", "AP5", "output.pdb", ph=7.0, relax=True)
 3. The chosen template's formal charges **and** total hydrogen counts are
    mapped back onto the original atoms via a charge-insensitive substructure
    match (so `-COOH` still matches `-COO⁻`). Carrying the H count — not just
-   the charge — keeps RDKit's kekulization correct on aromatic heterocycles.
+   the charge — keeps the RDKit's kekulization correct on aromatic heterocycles.
 4. With 3D input, `Chem.AddHs(addCoords=True)` adds hydrogens positioned from
    the existing geometry; heavy-atom coordinates are never moved. Without
    coordinates (SMILES), protonation stays implicit.
