@@ -34,33 +34,34 @@ Everything is exposed both as a **command-line tool** and as an importable
 
 ## Installation
 
-The two modes have independent dependencies; install whichever you need
-(imports are lazy, so ligand mode never requires the protein libraries and
-vice versa).
+Clone the repo and install it with `pip`:
 
 ```bash
-# Ligand mode
-pip install rdkit dimorphite-dl
-
-# Protein mode
-pip install biotite hydride numpy
+git clone https://github.com/PatWalters/protonate
+cd protonate
+pip install -e .
 ```
+
+This puts a `protonate-utils` command on your `PATH` and makes
+`import protonate_utils` available.
 
 ## Command-line usage
 
-The first argument selects the mode: `ligand` or `protein`.
+Once installed, use the `protonate-utils` command. The first argument selects
+the mode: `ligand` or `protein`. (You can also run it without installing via
+`python protonate_utils.py …` from a checkout.)
 
 ### Ligands
 
 ```bash
 # SDF in, SDF out (3D coordinates preserved, hydrogens placed from geometry)
-python protonate_utils.py ligand input.sdf output.sdf
+protonate-utils ligand input.sdf output.sdf
 
 # SMILES in, SMILES out, at a custom pH
-python protonate_utils.py ligand input.smi output.smi --ph 7.4
+protonate-utils ligand input.smi output.smi --ph 7.4
 
 # Mixed: read SDF, write SMILES
-python protonate_utils.py ligand input.sdf output.smi
+protonate-utils ligand input.sdf output.smi
 ```
 
 Input and output formats are inferred from the file extension:
@@ -78,10 +79,10 @@ stderr; the run reports how many were read, written, and skipped.
 
 ```bash
 # Remove a bound ligand by residue name, then add hydrogens
-python protonate_utils.py protein input.pdb AP5 output.pdb
+protonate-utils protein input.pdb AP5 output.pdb
 
 # Keep everything (no ligand removal)
-python protonate_utils.py protein input.pdb none output.pdb --ph 7.0
+protonate-utils protein input.pdb none output.pdb --ph 7.0
 ```
 
 The second positional argument is the residue name (3-letter CCD code) of a
