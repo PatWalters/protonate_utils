@@ -58,6 +58,68 @@ def test_glycine_is_zwitterion_end_to_end():
     )
 
 
+def test_pick_state_keeps_amide_neutral():
+    # Dimorphite enumerates a deprotonated carboxamide microstate, but an
+    # amide N-H (pKa ~17-22) is neutral at pH 7.4. The "most ionized" rule
+    # alone would wrongly pick the [N-]; the site-by-site check must reject
+    # it and keep the neutral amide.
+    states = ["CC(=O)[N-]C", "CC(=O)NC"]
+    assert _canon(_pick_state("CC(=O)NC", states)) == _canon("CC(=O)NC")
+
+
+def test_pick_state_amide_neutral_amine_protonated():
+    # A molecule with both an amide and a basic amine: the amide stays
+    # neutral while the amine is protonated.
+    states = [
+        "CC(=O)NCC[NH3+]",  # legitimate: amine protonated
+        "CC(=O)[N-]CCN",    # illegitimate: amide deprotonated
+        "CC(=O)NCCN",       # nothing ionized
+    ]
+    assert _canon(_pick_state("CC(=O)NCCN", states)) == _canon("CC(=O)NCC[NH3+]")
+
+
+def test_amide_not_deprotonated_end_to_end():
+    # Regression for the reported bug: a secondary amide must not come back
+    # as its deprotonated [N-] form.
+    out = _canon(protonate_smiles_string("CC(=O)NC1CC1", ph=7.4))
+    assert "-" not in out, f"amide was deprotonated: {out}"
+    assert out == _canon("CC(=O)NC1CC1")
+
+
+def test_pick_state_keeps_ordinary_azole_neutral():
+    # An imidazole N-H (pKa ~14.5) is neutral at pH 7.4; the [n-] microstate
+    # Dimorphite enumerates must be rejected, not chosen as "most ionized".
+    assert _canon(_pick_state("c1cnc[nH]1", ["c1cnc[n-]1", "c1cnc[nH]1"])) == _canon(
+        "c1cnc[nH]1"
+    )
+
+
+def test_pick_state_deprotonates_tetrazole():
+    # A tetrazole N-H (pKa ~4.9) IS acidic at pH 7.4, so the anion is correct.
+    assert _canon(_pick_state("c1nnn[nH]1", ["c1nnn[n-]1", "c1nnn[nH]1"])) == _canon(
+        "c1nnn[n-]1"
+    )
+
+
+def test_aromatic_heterocycle_does_not_crash_and_stays_neutral():
+    # Regression: neutralizing a protonated aromatic heterocycle used to make
+    # RDKit fail to kekulize, so indazole/imidazole molecules were skipped.
+    # They must now process and keep the weakly-acidic ring N-H neutral.
+    smi = "CC(C)(C)c1cc(NC(=O)c2cccc3cn[nH]c23)[nH]n1"  # fused indazole + pyrazole
+    out = _canon(protonate_smiles_string(smi, ph=7.4))
+    assert "[n-]" not in out, f"azole was deprotonated: {out}"
+    assert out == _canon(smi)
+
+
+def test_guanidine_is_protonated_end_to_end():
+    # Regression: bond orders must be preserved during atom mapping so an
+    # amidine/guanidine =N is not confused with -N (which overflowed valence
+    # and skipped the molecule). The strong base must end up protonated.
+    out = _canon(protonate_smiles_string("N=C(N)N/N=C/c1c(Cl)cccc1Cl", ph=7.4))
+    assert "+" in out, f"guanidine was not protonated: {out}"
+    assert out == _canon("NC(=[NH2+])N/N=C/c1c(Cl)cccc1Cl")
+
+
 if __name__ == "__main__":
     failures = 0
     for name, fn in sorted(globals().items()):

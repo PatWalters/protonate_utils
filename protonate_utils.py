@@ -46,13 +46,24 @@ import sys
 # Ligand mode (RDKit + Dimorphite-DL)
 # ---------------------------------------------------------------------------
 
-def _neutralized_copy(mol):
+def _skeleton_copy(mol):
     """
-    Return a copy of `mol` with all formal charges and explicit H counts
-    zeroed, for use as a charge-insensitive substructure-match template.
-    Sanitization is best-effort; if neutralization produces an invalid
-    valence, we fall back to a partial sanitize that still updates ring
-    info (which substructure matching uses).
+    Return a charge- and H-agnostic copy of `mol` for use as a
+    substructure-match template that aligns two molecules differing only in
+    protonation state (an input molecule against a Dimorphite-DL microstate of
+    itself).
+
+    Bond orders and aromaticity are preserved -- they are what distinguishes,
+    say, an amidine's ``=N`` from its ``-N``, so flattening them would let the
+    charge/H mapping land on the wrong nitrogen and blow up its valence.
+    Only formal charges, explicit Hs and radicals are cleared, and implicit
+    Hs are switched off so a neutralized cation can't overflow its valence.
+
+    Crucially we do *not* run a full sanitize: re-kekulizing a neutralized
+    aromatic cation such as a protonated pyridinium ``[nH+]`` is what made the
+    indazole/imidazole molecules fail. The molecule keeps the aromaticity
+    perceived at parse time, and a light property-cache/ring refresh is all
+    substructure matching needs, so this never raises.
     """
     from rdkit import Chem
 
@@ -60,18 +71,123 @@ def _neutralized_copy(mol):
     for a in m.GetAtoms():
         a.SetFormalCharge(0)
         a.SetNumExplicitHs(0)
-        a.SetNoImplicit(False)
-    try:
-        Chem.SanitizeMol(m)
-    except Exception:
-        Chem.SanitizeMol(
-            m,
-            sanitizeOps=(
-                Chem.SanitizeFlags.SANITIZE_ALL
-                ^ Chem.SanitizeFlags.SANITIZE_PROPERTIES
-            ),
-        )
+        a.SetNoImplicit(True)
+        a.SetNumRadicalElectrons(0)
+    m.UpdatePropertyCache(strict=False)
+    Chem.FastFindRings(m)
     return m
+
+
+def _is_amide_nitrogen(n_atom):
+    """
+    True if `n_atom` is a (thio)carboxamide nitrogen -- bonded to a carbon
+    that bears a double bond to O or S -- and *not* also bonded to a sulfonyl
+    group. A plain carboxamide N-H has pKa ~17-22 and stays neutral at
+    physiological pH, but an (acyl)sulfonamide N-H is genuinely acidic, so we
+    exclude that case (the caller treats its deprotonation as legitimate).
+    """
+    from rdkit import Chem
+
+    has_carbonyl = False
+    has_sulfonyl = False
+    for nbr in n_atom.GetNeighbors():
+        z = nbr.GetAtomicNum()
+        if z == 6:
+            for b in nbr.GetBonds():
+                other = b.GetOtherAtom(nbr)
+                if (b.GetBondType() == Chem.BondType.DOUBLE
+                        and other.GetAtomicNum() in (8, 16)):
+                    has_carbonyl = True
+        elif z == 16:
+            # Sulfonyl S(=O)(=O) neighbour -> acidic (acyl)sulfonamide.
+            o_doubles = sum(
+                1 for b in nbr.GetBonds()
+                if b.GetBondType() == Chem.BondType.DOUBLE
+                and b.GetOtherAtom(nbr).GetAtomicNum() == 8
+            )
+            if o_doubles >= 2:
+                has_sulfonyl = True
+    return has_carbonyl and not has_sulfonyl
+
+
+def _is_acidic_aromatic_nitrogen(n_atom):
+    """
+    True if `n_atom` is an aromatic ring N-H acidic enough to deprotonate near
+    physiological pH. In practice that means only tetrazole-grade azoles,
+    whose ring carries four nitrogens (N-H pKa ~4.9). The common aromatic
+    N-H heterocycles -- pyrrole/indole (1 ring N, pKa ~17), imidazole/pyrazole
+    (2 N, pKa ~14), triazole (3 N, pKa ~10) -- are >99% neutral at pH 7.4, so
+    their Dimorphite-enumerated ``[n-]`` microstates must be rejected.
+    """
+    mol = n_atom.GetOwningMol()
+    ring_info = mol.GetRingInfo()
+    idx = n_atom.GetIdx()
+    most_ring_nitrogens = 0
+    for ring in ring_info.AtomRings():
+        if idx in ring:
+            n_count = sum(
+                1 for i in ring if mol.GetAtomWithIdx(i).GetAtomicNum() == 7
+            )
+            most_ring_nitrogens = max(most_ring_nitrogens, n_count)
+    return most_ring_nitrogens >= 4
+
+
+def _charge_change_is_legitimate(atom, delta_q):
+    """
+    Decide whether changing `atom`'s formal charge by `delta_q` (candidate
+    minus input) reflects a real ionization near physiological pH.
+
+    Protonation to a cation is only sensible on a nitrogen base (amine,
+    amidine, guanidine, aromatic N). Deprotonation to an anion is sensible on
+    an oxygen/sulfur acid (carboxyl, phenol, thiol, phosphate) and on a
+    genuinely acidic nitrogen (sulfonamide, tetrazole, ...). It is *not*
+    sensible on the weakly-acidic nitrogen groups that Dimorphite-DL
+    nonetheless enumerates a deprotonated microstate for: a plain carboxamide
+    (pKa ~17-22) or an ordinary aromatic N-H heterocycle such as
+    imidazole/pyrazole/indazole/indole (pKa ~13-17). Flagging those here lets
+    the selector reject them.
+    """
+    if delta_q > 0:
+        return atom.GetAtomicNum() == 7
+    # delta_q < 0: deprotonation to an anion.
+    z = atom.GetAtomicNum()
+    if z in (8, 16):
+        return True
+    if z == 7:
+        if _is_amide_nitrogen(atom):
+            return False
+        if atom.GetIsAromatic() and not _is_acidic_aromatic_nitrogen(atom):
+            return False
+        return True
+    return False
+
+
+def _count_illegitimate_ionizations(input_mol, cand_mol):
+    """
+    Align `cand_mol` to `input_mol` atom-by-atom -- their heavy-atom
+    skeletons are identical, only protonation differs -- and count the formal
+    charge changes that don't correspond to a legitimate ionization (see
+    `_charge_change_is_legitimate`). Comparing against the input (rather than
+    against neutral) means a charge already present in the input is never
+    penalised; only newly introduced, chemically implausible ionizations are.
+
+    Returns a large sentinel if the two can't be aligned, so such candidates
+    sort last without crashing the selection.
+    """
+    match = _skeleton_copy(input_mol).GetSubstructMatch(
+        _skeleton_copy(cand_mol)
+    )
+    if not match or len(match) != cand_mol.GetNumAtoms():
+        return 1_000_000
+
+    bad = 0
+    for cand_idx, input_idx in enumerate(match):
+        ca = cand_mol.GetAtomWithIdx(cand_idx)
+        ia = input_mol.GetAtomWithIdx(input_idx)
+        delta_q = ca.GetFormalCharge() - ia.GetFormalCharge()
+        if delta_q and not _charge_change_is_legitimate(ca, delta_q):
+            bad += 1
+    return bad
 
 
 def _pick_state(input_smiles, states):
@@ -84,29 +200,47 @@ def _pick_state(input_smiles, states):
     e.g. a secondary alkyl amide can come back as either NH or N-, and
     we'd silently flip between them on re-runs.
 
-    When dimorphite is uncertain it returns both the ionized and the
-    neutral microstate (e.g. a primary amine comes back as both
-    ``CCC[NH3+]`` and ``CCCN``). Prefer the *most ionized* state -- the
-    one with the greatest total ionic character, measured as the sum of
-    |formal charge| over all atoms. This matches dimorphite's intent
-    (protonate bases, deprotonate acids) and, unlike "match the input
-    charge", does not collapse back to a neutral input that was simply
-    drawn without explicit charges. A zwitterion (net charge 0 but two
-    charged atoms) is correctly preferred over its neutral form. The
-    SMILES string is a deterministic tiebreak. For groups with pKa far
-    from the pH window dimorphite returns a single state, so the choice
-    only matters when dimorphite is unsure.
+    Selection happens in two tiers (lower is better):
+
+    1. **Site-by-site plausibility.** Each candidate is aligned to the
+       input atom-by-atom and its formal-charge changes are checked: a
+       cation must form on a nitrogen base, an anion on an O/S acid or a
+       genuinely acidic nitrogen (sulfonamide, tetrazole, ...). Dimorphite
+       also enumerates implausible microstates -- most notably a
+       deprotonated carboxamide ``C(=O)[N-]`` (N-H pKa ~17-22) -- and those
+       are penalised by their count of illegitimate changes, so the neutral
+       amide is kept over its bogus anion.
+
+    2. **Most ionized.** Among equally plausible candidates, prefer the one
+       with the greatest total ionic character (sum of |formal charge|).
+       When dimorphite is unsure it returns both the ionized and the neutral
+       form (a primary amine comes back as both ``CCC[NH3+]`` and ``CCCN``);
+       this keeps the ionized one and, unlike "match the input charge", does
+       not collapse back to a neutral input drawn without explicit charges. A
+       zwitterion (net charge 0 but two charged atoms) is preferred over its
+       neutral form.
+
+    The SMILES string is a final deterministic tiebreak. For groups with
+    pKa far from the pH window dimorphite returns a single state, so the
+    choice only matters when dimorphite is unsure.
     """
     from rdkit import Chem
 
+    input_mol = Chem.MolFromSmiles(input_smiles)
+
     def score(smi):
         m = Chem.MolFromSmiles(smi)
-        ionic = (
-            sum(abs(a.GetFormalCharge()) for a in m.GetAtoms())
-            if m else -1
+        if m is None:
+            # Unparseable candidate: sort strictly last.
+            return (1_000_000, 0, smi)
+        illegitimate = (
+            _count_illegitimate_ionizations(input_mol, m)
+            if input_mol is not None else 0
         )
-        # Maximize ionic character (negate for min), then SMILES tiebreak.
-        return (-ionic, smi)
+        ionic = sum(abs(a.GetFormalCharge()) for a in m.GetAtoms())
+        # Fewest implausible ionizations first, then most ionized
+        # (negate for min), then SMILES tiebreak.
+        return (illegitimate, -ionic, smi)
 
     return min(states, key=score)
 
@@ -137,10 +271,11 @@ def _target_atom_states(mol_heavy, ph):
             f"RDKit could not parse Dimorphite-DL output {chosen!r}"
         )
 
-    # Map heavy-atom indices between original and template via a
-    # charge-stripped substructure match (so e.g. -COOH still matches -COO-).
-    match = _neutralized_copy(mol_heavy).GetSubstructMatch(
-        _neutralized_copy(template)
+    # Map heavy-atom indices between original and template via a skeleton
+    # (charge/H/bond-order-agnostic) match, so e.g. -COOH still matches -COO-
+    # and protonated aromatic heterocycles still match their neutral form.
+    match = _skeleton_copy(mol_heavy).GetSubstructMatch(
+        _skeleton_copy(template)
     )
     if not match:
         raise RuntimeError(
