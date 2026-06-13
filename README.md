@@ -178,10 +178,12 @@ prepare_structure("input.pdb", "AP5", "output.pdb", ph=7.0, relax=True)
 
 1. Pre-existing hydrogens are stripped; any 3D conformer on the heavy atoms is
    kept.
-2. Dimorphite-DL predicts the dominant microstate(s) within a ±0.5 pH window.
-   When it returns more than one, the state whose net formal charge is closest
-   to the input molecule's charge is chosen deterministically (with the SMILES
-   string as a tiebreak), so re-runs are stable.
+2. Dimorphite-DL enumerates candidate microstate(s) within a ±0.5 pH window.
+   One is chosen deterministically by a **site-by-site plausibility** check
+   rather than by net charge — see
+   [Correcting Dimorphite-DL microstates](#correcting-dimorphite-dl-microstates)
+   below — and any residual implausible ionization is repaired against the
+   input. The SMILES string is a final tiebreak, so re-runs are stable.
 3. The chosen template's formal charges **and** total hydrogen counts are
    mapped back onto the original atoms via a charge-insensitive substructure
    match (so `-COOH` still matches `-COO⁻`). Carrying the H count — not just
@@ -189,6 +191,46 @@ prepare_structure("input.pdb", "AP5", "output.pdb", ph=7.0, relax=True)
 4. With 3D input, `Chem.AddHs(addCoords=True)` adds hydrogens positioned from
    the existing geometry; heavy-atom coordinates are never moved. Without
    coordinates (SMILES), protonation stays implicit.
+
+### Correcting Dimorphite-DL microstates
+
+Dimorphite-DL enumerates *every* microstate whose modeled pKa falls anywhere
+near the pH window, including many that are negligibly populated at pH 7.4. Left
+to a "most ionized" or "closest net charge" rule, the selector picks chemically
+wrong states: it deprotonates amides and phenols and protonates anilines. We add
+a per-atom legitimacy check (`_charge_change_is_legitimate`) that compares each
+candidate to the input atom-by-atom and accepts a formal-charge change only when
+that group genuinely ionizes near physiological pH:
+
+| Group | Typical pKa | At pH 7.4 | Dimorphite enumerates | We |
+|-------|-------------|-----------|-----------------------|----|
+| Aliphatic amine | pKaH ~10 | cation | both | **protonate** |
+| Amidine / guanidine | pKaH ~12–13 | cation | both | **protonate** |
+| Carboxylic acid | ~4 | anion | anion | **deprotonate** |
+| Sulfonic / sulfinic / phosphate / phosphonate | <2–7 | anion | anion | **deprotonate** |
+| Sulfonamide / acylsulfonamide / tetrazole | ~3–10 | anion | both | **deprotonate** |
+| Carboxamide N–H | ~17–22 | neutral | both → `[N⁻]` *or* `[NH⁺]` | **keep neutral** |
+| Aniline / amino-heteroarene | pKaH ~3–5 | neutral | both → `[NH⁺]` | **keep neutral** |
+| Imidazole / pyrazole / indazole / indole / triazole N–H | ~10–17 | neutral | both → `[n⁻]` | **keep neutral** |
+| Phenol / alcohol | ~10–16 | neutral | both → `[O⁻]` | **keep neutral** |
+| Plain thiol / thione | ~7–10 | neutral | both → `[S⁻]` | **keep neutral** |
+
+Two further safeguards:
+
+- **Repair fallback.** When Dimorphite offers *only* an implausibly-ionized
+  microstate (e.g. it returns just the `[N⁻]` form of an O-alkyl hydroxamate or
+  imide, with no neutral alternative to select), the offending site is reverted
+  to the input's protonation rather than emitted as-is.
+- **Input charges preserved.** A change is only judged relative to the input, so
+  charges already present in the SMILES — quaternary ammonium salts, *N*-oxides,
+  mesoionic zwitterions — are never altered.
+
+Borderline acids/bases whose pKa sits right at 7.4 (e.g. *p*-nitrophenol ~7.15,
+mercaptoazoles ~7) are deliberately defaulted to neutral; they are ~50/50 at
+physiological pH, so this is at least as defensible as ionizing them and avoids
+mis-ionizing the far more common ordinary phenols and amides. Validated across
+the 2,173-molecule Biogen logS set: no skips, no heavy-atom changes, and the
+selection is deterministic.
 
 ### Protein protonation
 
