@@ -34,7 +34,14 @@ Everything is exposed both as a **command-line tool** and as an importable
 
 ## Installation
 
-Clone the repo and install it with `pip`:
+Install the latest release from [PyPI](https://pypi.org/project/protonate-utils/)
+with `pip`:
+
+```bash
+pip install protonate-utils
+```
+
+Or install from a checkout for development:
 
 ```bash
 git clone https://github.com/PatWalters/protonate_utils
@@ -42,7 +49,7 @@ cd protonate_utils
 pip install -e .
 ```
 
-This installs the dependencies for both modes (RDKit + Dimorphite-DL for
+Either way installs the dependencies for both modes (RDKit + Dimorphite-DL for
 ligands, Biotite + Hydride + NumPy for proteins), puts a `protonate-utils`
 command on your `PATH`, and makes `import protonate_utils` available.
 
