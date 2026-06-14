@@ -211,6 +211,7 @@ that group genuinely ionizes near physiological pH:
 | Sulfonamide / acylsulfonamide / tetrazole | ~3–10 | anion | both | **deprotonate** |
 | Carboxamide N–H | ~17–22 | neutral | both → `[N⁻]` *or* `[NH⁺]` | **keep neutral** |
 | Aniline / amino-heteroarene | pKaH ~3–5 | neutral | both → `[NH⁺]` | **keep neutral** |
+| Cyanamide (N–C≡N) | pKaH ~0 | neutral | both → `[NH⁺]` | **keep neutral** |
 | Imidazole / pyrazole / indazole / indole / triazole N–H | ~10–17 | neutral | both → `[n⁻]` | **keep neutral** |
 | Phenol / alcohol | ~10–16 | neutral | both → `[O⁻]` | **keep neutral** |
 | Plain thiol / thione | ~7–10 | neutral | both → `[S⁻]` | **keep neutral** |

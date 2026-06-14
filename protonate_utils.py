@@ -163,6 +163,30 @@ def _is_aromatic_amine_nitrogen(n_atom):
     return any(nbr.GetIsAromatic() for nbr in n_atom.GetNeighbors())
 
 
+def _is_cyanamide_nitrogen(n_atom):
+    """
+    True if `n_atom` is a cyanamide nitrogen -- bonded to a nitrile carbon
+    (N-C#N). The triple-bonded nitrile is strongly electron-withdrawing and
+    ties up the nitrogen lone pair, so a dialkylcyanamide has pKaH ~0 (cyanamide
+    itself is faintly *acidic*, pKa ~10) and is non-basic at pH 7.4. Dimorphite-DL
+    nonetheless enumerates a protonated microstate for it, which we must reject.
+    """
+    from rdkit import Chem
+
+    if n_atom.GetAtomicNum() != 7:
+        return False
+    for nbr in n_atom.GetNeighbors():
+        if nbr.GetAtomicNum() != 6:
+            continue
+        for b in nbr.GetBonds():
+            other = b.GetOtherAtom(nbr)
+            if (b.GetBondType() == Chem.BondType.TRIPLE
+                    and other.GetAtomicNum() == 7
+                    and other.GetIdx() != n_atom.GetIdx()):
+                return True
+    return False
+
+
 def _bonded_to_acidifying_centre(atom):
     """
     True if `atom` is bonded to an electron-withdrawing centre that makes an
@@ -267,6 +291,8 @@ def _charge_change_is_legitimate(atom, delta_q):
         if _nitrogen_is_acylated_or_sulfonylated(atom):
             return False
         if _is_aromatic_amine_nitrogen(atom):
+            return False
+        if _is_cyanamide_nitrogen(atom):
             return False
         return True
     # delta_q < 0: deprotonation to an anion.

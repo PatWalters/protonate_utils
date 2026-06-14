@@ -206,6 +206,22 @@ def test_benzylamine_still_protonates_end_to_end():
     assert _canon(out) == _canon("[NH3+]Cc1ccccc1")
 
 
+def test_cyanamide_nitrogen_is_not_protonated_end_to_end():
+    # An N-cyanopiperidine is a cyanamide (N-C#N): the nitrile guts the
+    # nitrogen's basicity (pKaH ~0), so it stays neutral despite Dimorphite
+    # enumerating the [NH+] microstate -- unlike a plain piperidine.
+    smi = "N#CN1CCC[C@H](n2nc(-c3ccc(Oc4ccc(F)cc4F)cc3)c(C(N)=O)c2N)C1"
+    out = _canon(protonate_smiles_string(smi, ph=7.4))
+    assert "+" not in out, f"cyanamide nitrogen was protonated: {out}"
+    assert out == _canon(smi)
+
+
+def test_simple_cyanamide_stays_neutral_but_piperidine_protonates():
+    # Minimal pair: the cyanamide N stays neutral, the bare piperidine does not.
+    assert "+" not in _canon(protonate_smiles_string("N#CN1CCCCC1", ph=7.4))
+    assert "+" in _canon(protonate_smiles_string("C1CCNCC1", ph=7.4))
+
+
 def test_pick_state_keeps_ordinary_azole_neutral():
     # An imidazole N-H (pKa ~14.5) is neutral at pH 7.4; the [n-] microstate
     # Dimorphite enumerates must be rejected, not chosen as "most ionized".
