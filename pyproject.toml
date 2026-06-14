@@ -20,15 +20,17 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Chemistry",
 ]
 
-# The two modes have independent dependencies and lazy imports, so the
-# base install pulls in nothing heavy. Install the extra(s) you need.
-dependencies = []
+# Both modes' dependencies are installed by a plain `pip install`.
+dependencies = [
+    "rdkit",
+    "dimorphite-dl",
+    "biotite",
+    "hydride",
+    "numpy",
+]
 
 [project.optional-dependencies]
-ligand = ["rdkit", "dimorphite-dl"]
-protein = ["biotite", "hydride", "numpy"]
-all = ["rdkit", "dimorphite-dl", "biotite", "hydride", "numpy"]
-test = ["pytest", "rdkit", "dimorphite-dl"]
+test = ["pytest"]
 
 [project.urls]
 Homepage = "https://github.com/PatWalters/protonate_utils"

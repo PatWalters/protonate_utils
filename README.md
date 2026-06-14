@@ -42,17 +42,9 @@ cd protonate_utils
 pip install -e .
 ```
 
-The base install is intentionally dependency-free (both modes use lazy
-imports), so install the extra(s) for the mode(s) you need:
-
-```bash
-pip install -e ".[ligand]"   # RDKit + Dimorphite-DL  (small-molecule mode)
-pip install -e ".[protein]"  # Biotite + Hydride + NumPy (protein mode)
-pip install -e ".[all]"      # everything
-```
-
-This puts a `protonate-utils` command on your `PATH` and makes
-`import protonate_utils` available.
+This installs the dependencies for both modes (RDKit + Dimorphite-DL for
+ligands, Biotite + Hydride + NumPy for proteins), puts a `protonate-utils`
+command on your `PATH`, and makes `import protonate_utils` available.
 
 ## Command-line usage
 
