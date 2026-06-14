@@ -1,5 +1,9 @@
 # protonate_utils
 
+<p align="center">
+  <img src="acid_robot.png" alt="A robot abstracting a proton from a carboxylic acid to leave a carboxylate" width="420">
+</p>
+
 A single utility for adding hydrogens to **ligands** and **proteins** at a
 target pH, for use in molecular modeling and structure-based drug design.
 
