@@ -31,7 +31,9 @@ all = ["rdkit", "dimorphite-dl", "biotite", "hydride", "numpy"]
 test = ["pytest", "rdkit", "dimorphite-dl"]
 
 [project.urls]
-Homepage = "https://github.com/PatWalters/protonate"
+Homepage = "https://github.com/PatWalters/protonate_utils"
+Repository = "https://github.com/PatWalters/protonate_utils"
+Issues = "https://github.com/PatWalters/protonate_utils/issues"
 
 [project.scripts]
 protonate-utils = "protonate_utils:main"

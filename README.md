@@ -37,9 +37,18 @@ Everything is exposed both as a **command-line tool** and as an importable
 Clone the repo and install it with `pip`:
 
 ```bash
-git clone https://github.com/PatWalters/protonate
-cd protonate
+git clone https://github.com/PatWalters/protonate_utils
+cd protonate_utils
 pip install -e .
+```
+
+The base install is intentionally dependency-free (both modes use lazy
+imports), so install the extra(s) for the mode(s) you need:
+
+```bash
+pip install -e ".[ligand]"   # RDKit + Dimorphite-DL  (small-molecule mode)
+pip install -e ".[protein]"  # Biotite + Hydride + NumPy (protein mode)
+pip install -e ".[all]"      # everything
 ```
 
 This puts a `protonate-utils` command on your `PATH` and makes
