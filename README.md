@@ -102,10 +102,36 @@ ligand to remove before protonation; pass `none` to keep all atoms. Output
 hydrogens are reordered so each one immediately follows the heavy atom it is
 bonded to.
 
-| Option       | Default | Description                                         |
-|--------------|---------|-----------------------------------------------------|
-| `--ph`       | `7.0`   | pH used to estimate amino-acid formal charges.      |
-| `--no-relax` | off     | Skip dihedral relaxation of the added hydrogens.    |
+| Option                    | Default | Description                                                                 |
+|---------------------------|---------|-----------------------------------------------------------------------------|
+| `--ph`                    | `7.0`   | pH used to estimate amino-acid formal charges.                              |
+| `--no-relax`              | off     | Skip dihedral relaxation of the added hydrogens.                           |
+| `--no-honor-protonation`  | off     | Ignore force-field protonation names and (re)protonate every residue from `--ph`. |
+
+#### Force-field protonation/tautomer residue names
+
+Inputs from force fields often name residues by their protonation or tautomer
+state — `HID`/`HIE`/`HIP` (and CHARMM `HSD`/`HSE`/`HSP`), `ASH`, `GLH`, `LYN`,
+`ARN`, `CYM`, `TYM`, `CYX`. These are not CCD codes, so Biotite cannot assign
+their bonds (`HID`/`HIE` even collide with unrelated CCD entries), which
+previously left those residues unbonded and unprotonated. They are now
+normalized to their canonical CCD residue, and **by default the exact state the
+name encodes is preserved**, overriding the pH estimate:
+
+| Name(s)              | Enforced state                                  |
+|----------------------|-------------------------------------------------|
+| `HID` / `HSD`        | neutral histidine, proton on **ND1** (δ)        |
+| `HIE` / `HSE`        | neutral histidine, proton on **NE2** (ε)        |
+| `HIP` / `HSP`        | **+1** imidazolium (both ring N protonated)      |
+| `ASH` / `GLH`        | neutral (protonated) Asp / Glu                  |
+| `LYN` / `ARN`        | neutral Lys / Arg                               |
+| `CYM`                | thiolate (−1)                                    |
+| `TYM`                | tyrosinate (−1)                                  |
+| `CYX`                | disulfide cysteine — S–S bonded to its nearest partner, left unprotonated |
+
+Pass `--no-honor-protonation` to discard the input distinction and protonate
+every residue purely from `--ph` instead. Structures using only standard
+residue names are unaffected either way.
 
 ## Python API
 
@@ -166,15 +192,19 @@ from protonate_utils import protonate_structure
 structure = pdb.PDBFile.read("input.pdb").get_structure(model=1)
 hydrogenated = protonate_structure(
     structure,
-    ligand_res_name="AP5",   # or None / "none" to keep all atoms
+    ligand_res_name="AP5",     # or None / "none" to keep all atoms
     ph=7.0,
     relax=True,
+    honor_protonation=True,    # preserve HID/HIE/HIP/CYX/... states (default)
 )
 ```
 
 `protonate_structure` raises `ValueError` if `ligand_res_name` is given but no
 atoms with that residue name exist. The returned `AtomArray` has hydrogens
-added and reordered to follow their bonded heavy atoms.
+added and reordered to follow their bonded heavy atoms. Force-field protonation
+residue names are honored by default; pass `honor_protonation=False` to
+protonate from `ph` alone (see
+[Force-field protonation/tautomer residue names](#force-field-protonationtautomer-residue-names)).
 
 Read a PDB, protonate, and write a PDB in one call (the CLI protein path):
 
@@ -249,10 +279,16 @@ selection is deterministic.
 
 1. Optionally remove a ligand by residue name, then strip any existing
    hydrogens.
-2. Assign covalent bonds from CCD residue templates
+2. Normalize force-field protonation/tautomer residue names (`HID`/`HIE`/`HIP`,
+   `CYX`, `ASH`, …) to their canonical CCD codes so their bonds can be assigned.
+3. Assign covalent bonds from CCD residue templates
    (`connect_via_residue_names`).
-3. Estimate per-residue formal charges for canonical amino acids at the
-   requested pH (`hydride.estimate_amino_acid_charges`).
-4. Add hydrogens with Hydride and, by default, relax their geometry.
-5. Reorder atoms so each hydrogen immediately follows the heavy atom it is
+4. Estimate per-residue formal charges for canonical amino acids at the
+   requested pH (`hydride.estimate_amino_acid_charges`). When
+   `honor_protonation` is set (the default), each force-field-named residue is
+   then pinned to the exact state its name encodes — overriding charges, and,
+   for the `HID` δ-tautomer, swapping the imidazole ring double bond so the
+   proton lands on ND1, and, for `CYX`, adding the S–S bond.
+5. Add hydrogens with Hydride and, by default, relax their geometry.
+6. Reorder atoms so each hydrogen immediately follows the heavy atom it is
    bonded to.
