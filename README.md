@@ -9,12 +9,12 @@ target pH, for use in molecular modeling and structure-based drug design.
 
 ## Why this exists
 
-Most structures you download — a ligand from a database, a protein from the
-PDB — are missing hydrogens, or carry hydrogens that don't reflect the
+Most structures you download (a ligand from a database, a protein from the
+PDB) are missing hydrogens, or carry hydrogens that don't reflect the
 protonation state at physiological pH. Getting these right matters: a
 carboxylic acid is deprotonated (`-COO⁻`) at pH 7.4, a basic amine is
 protonated (`-NH₃⁺`), and a histidine side chain can go either way. Downstream
-tasks — docking, free-energy calculations, MD simulations, electrostatics —
+tasks (docking, free-energy calculations, MD simulations, electrostatics)
 all depend on the correct charge and hydrogen placement.
 
 Ligands and proteins need different tools for this. Small molecules are best
@@ -26,7 +26,7 @@ have to remember two separate workflows:
 - **Ligands** use [Dimorphite-DL](https://github.com/durrantlab/dimorphite_dl)
   for pH-aware protonation states and [the RDKit](https://www.rdkit.org/) for
   structure handling. When the input has 3D coordinates, the heavy-atom
-  geometry is preserved exactly — only the newly added hydrogens are given
+  geometry is preserved exactly; only the newly added hydrogens are given
   computed positions.
 - **Proteins** use [Hydride](https://hydride.biotite-python.org/) for
   geometry-based hydrogen addition and
@@ -98,7 +98,7 @@ protonate-utils protein input.pdb none output.pdb --ph 7.0
 ```
 
 The second positional argument is the residue name (3-letter CCD code) of a
-ligand to remove before protonation — pass `none` to keep all atoms. Output
+ligand to remove before protonation; pass `none` to keep all atoms. Output
 hydrogens are reordered so each one immediately follows the heavy atom it is
 bonded to.
 
@@ -115,7 +115,7 @@ in-memory and file-to-file entry points for both ligands and proteins.
 |                  | Ligands                                  | Proteins                          |
 |------------------|------------------------------------------|-----------------------------------|
 | In-memory core   | `protonate_molecule(mol, ph)`            | `protonate_structure(structure, …)` |
-| Convenience      | `protonate_smiles_string(smiles, ph)`    | —                                 |
+| Convenience      | `protonate_smiles_string(smiles, ph)`    | N/A                               |
 | File → file      | `protonate_ligands(in, out, ph)`         | `prepare_structure(in, res, out, …)` |
 | I/O helpers      | `read_molecules(path)`, `make_writer(path)` | (Biotite `PDBFile`)            |
 
@@ -145,7 +145,7 @@ protonated = protonate_molecule(mol, ph=7.4)   # Mol with explicit Hs + coords
 ```
 
 Pass `add_coord_hs=False` to keep protonation implicit (no explicit hydrogen
-atoms added) — appropriate when you intend to serialize to SMILES.
+atoms added), appropriate when you intend to serialize to SMILES.
 
 Batch-convert a whole file (the CLI ligand path):
 
@@ -192,14 +192,14 @@ prepare_structure("input.pdb", "AP5", "output.pdb", ph=7.0, relax=True)
    kept.
 2. Dimorphite-DL enumerates candidate microstate(s) within a ±0.5 pH window.
    One is chosen deterministically by a **site-by-site plausibility** check
-   rather than by net charge — see
+   rather than by net charge (see
    [Correcting Dimorphite-DL microstates](#correcting-dimorphite-dl-microstates)
-   below — and any residual implausible ionization is repaired against the
+   below), and any residual implausible ionization is repaired against the
    input. The SMILES string is a final tiebreak, so re-runs are stable.
 3. The chosen template's formal charges **and** total hydrogen counts are
    mapped back onto the original atoms via a charge-insensitive substructure
-   match (so `-COOH` still matches `-COO⁻`). Carrying the H count — not just
-   the charge — keeps the RDKit's kekulization correct on aromatic heterocycles.
+   match (so `-COOH` still matches `-COO⁻`). Carrying the H count, not just
+   the charge, keeps the RDKit's kekulization correct on aromatic heterocycles.
 4. With 3D input, `Chem.AddHs(addCoords=True)` adds hydrogens positioned from
    the existing geometry; heavy-atom coordinates are never moved. Without
    coordinates (SMILES), protonation stays implicit.
@@ -235,8 +235,8 @@ Two further safeguards:
   imide, with no neutral alternative to select), the offending site is reverted
   to the input's protonation rather than emitted as-is.
 - **Input charges preserved.** A change is only judged relative to the input, so
-  charges already present in the SMILES — quaternary ammonium salts, *N*-oxides,
-  mesoionic zwitterions — are never altered.
+  charges already present in the SMILES (quaternary ammonium salts, *N*-oxides,
+  mesoionic zwitterions) are never altered.
 
 Borderline acids/bases whose pKa sits right at 7.4 (e.g. *p*-nitrophenol ~7.15,
 mercaptoazoles ~7) are deliberately defaulted to neutral; they are ~50/50 at
