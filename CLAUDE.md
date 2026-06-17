@@ -15,9 +15,13 @@ locally, so a manual upload would fail anyway.
 
 To cut a release:
 
-1. Bump `version` in `pyproject.toml` (e.g. `0.1.3` → `0.1.4`). Confirm the
-   exact version with the user before tagging — a PyPI version cannot be
-   reused once published, even after deletion.
+1. Bump `version` in `pyproject.toml` (e.g. `0.1.3` → `0.1.4`). Check the
+   current value first and ensure the new one is a correct, strictly
+   increasing increment over the last released version — compare against
+   the latest tag (`git tag --list`) and the live PyPI version (see step 5)
+   so you neither skip nor reuse a number. Confirm the exact version with
+   the user before tagging — a PyPI version cannot be reused once published,
+   even after deletion.
 2. Commit the bump and push to `main`:
    ```bash
    git commit -am "Bump version to X.Y.Z" && git push origin main
