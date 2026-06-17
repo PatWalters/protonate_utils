@@ -306,7 +306,4 @@ selection is deterministic.
 
 ## Acknowledgments
 
-Thanks to **Manish Sud** for helpful suggestions, including removing multiple
-ligands in a single call, writing explicit hydrogens to SDF output for SMILES
-input, skipping a header line in SMILES input files, and bundling a sample
-protein (`7axj_protein.pdb`) with bound ligands for testing ligand removal.
+Thanks to **Manish Sud** for helpful suggestions.
