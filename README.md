@@ -78,7 +78,10 @@ protonate-utils ligand input.sdf output.smi
 
 Input and output formats are inferred from the file extension:
 `.smi`/`.smiles` is treated as SMILES, anything else as SDF. SMILES files are
-read one molecule per line as `SMILES [optional name]`.
+read one molecule per line as `SMILES [optional name]`; an optional header line
+(e.g. `SMILES Name`) is detected and skipped automatically. When the output is
+SDF, explicit hydrogens are written even for SMILES input (positioned from the
+geometry when the input was 3D, otherwise added without coordinates).
 
 | Option   | Default | Description                          |
 |----------|---------|--------------------------------------|
@@ -93,14 +96,20 @@ stderr; the run reports how many were read, written, and skipped.
 # Remove a bound ligand by residue name, then add hydrogens
 protonate-utils protein input.pdb AP5 output.pdb
 
+# Remove several ligands at once with a comma-delimited list. The bundled
+# 7axj_protein.pdb has two pocket ligands, EST and CL6:
+protonate-utils protein 7axj_protein.pdb "EST,CL6" 7axj_out.pdb
+
 # Keep everything (no ligand removal)
 protonate-utils protein input.pdb none output.pdb --ph 7.0
 ```
 
 The second positional argument is the residue name (3-letter CCD code) of a
-ligand to remove before protonation; pass `none` to keep all atoms. Output
-hydrogens are reordered so each one immediately follows the heavy atom it is
-bonded to.
+ligand to remove before protonation. Pass a comma-delimited list (e.g.
+`"EST,CL6"`) to remove several residues at once — handy for clearing both a
+cofactor and a buffer/ion from a pocket — or `none` to keep all atoms. An error
+is raised naming any residue that isn't present. Output hydrogens are reordered
+so each one immediately follows the heavy atom it is bonded to.
 
 | Option                    | Default | Description                                                                 |
 |---------------------------|---------|-----------------------------------------------------------------------------|
@@ -230,9 +239,11 @@ prepare_structure("input.pdb", "AP5", "output.pdb", ph=7.0, relax=True)
    mapped back onto the original atoms via a charge-insensitive substructure
    match (so `-COOH` still matches `-COO⁻`). Carrying the H count, not just
    the charge, keeps the RDKit's kekulization correct on aromatic heterocycles.
-4. With 3D input, `Chem.AddHs(addCoords=True)` adds hydrogens positioned from
-   the existing geometry; heavy-atom coordinates are never moved. Without
-   coordinates (SMILES), protonation stays implicit.
+4. For SDF output, `Chem.AddHs` adds explicit hydrogens; with 3D input they are
+   positioned from the existing geometry (`addCoords=True`) and heavy-atom
+   coordinates are never moved, while SMILES input (no coordinates) still gets
+   explicit hydrogens, just without positions. For SMILES output, protonation
+   stays implicit so the writer renders it cleanly.
 
 ### Correcting Dimorphite-DL microstates
 
@@ -277,8 +288,8 @@ selection is deterministic.
 
 ### Protein protonation
 
-1. Optionally remove a ligand by residue name, then strip any existing
-   hydrogens.
+1. Optionally remove one or more ligands by residue name (a comma-delimited
+   list removes several at once), then strip any existing hydrogens.
 2. Normalize force-field protonation/tautomer residue names (`HID`/`HIE`/`HIP`,
    `CYX`, `ASH`, …) to their canonical CCD codes so their bonds can be assigned.
 3. Assign covalent bonds from CCD residue templates
@@ -292,3 +303,10 @@ selection is deterministic.
 5. Add hydrogens with Hydride and, by default, relax their geometry.
 6. Reorder atoms so each hydrogen immediately follows the heavy atom it is
    bonded to.
+
+## Acknowledgments
+
+Thanks to **Manish Sud** for helpful suggestions, including removing multiple
+ligands in a single call, writing explicit hydrogens to SDF output for SMILES
+input, skipping a header line in SMILES input files, and bundling a sample
+protein (`7axj_protein.pdb`) with bound ligands for testing ligand removal.

@@ -22,10 +22,11 @@ input has no coordinates, so protonation is applied without any geometry.
 
 Protein mode
 ------------
-Read a local PDB file, optionally remove a ligand by residue name, add
-hydrogens with Hydride at a target pH (default 7.0), and write the
-result to a PDB file. Hydrogens are reordered so that each hydrogen
-immediately follows the heavy atom to which it is bonded.
+Read a local PDB file, optionally remove one or more ligands by residue
+name (a comma-delimited list removes several at once, which also clears
+buffer/ion residues), add hydrogens with Hydride at a target pH (default
+7.0), and write the result to a PDB file. Hydrogens are reordered so that
+each hydrogen immediately follows the heavy atom to which it is bonded.
 
 Force-field protonation/tautomer residue names -- HID/HIE/HIP (and CHARMM
 HSD/HSE/HSP), ASH, GLH, LYN, ARN, CYM, TYM, CYX -- are normalized to their
@@ -42,7 +43,14 @@ Usage:
     protonate_utils.py ligand input.sdf output.sdf
     protonate_utils.py ligand input.smi output.smi --ph 7.4
     protonate_utils.py protein input.pdb AP5 output.pdb
+    protonate_utils.py protein input.pdb "EST,CL6" output.pdb  # remove several
     protonate_utils.py protein input.pdb none output.pdb --ph 7.0
+
+The repository ships sample data: 1bmk_ligand.sdf and 1bmk_protein.pdb
+(no bound ligand), plus 7axj_protein.pdb, which contains two pocket
+ligands (EST and CL6) for exercising ligand removal:
+
+    protonate_utils.py protein 7axj_protein.pdb "EST,CL6" 7axj_out.pdb
 """
 
 import argparse
@@ -507,11 +515,14 @@ def protonate_molecule(mol, ph, add_coord_hs=True):
     """
     Return a Mol with pH-appropriate protonation.
 
-    When the input carries a 3D conformer and `add_coord_hs` is set,
-    explicit hydrogens are added and positioned from the existing
-    geometry while the heavy-atom coordinates are preserved (this is the
-    SDF-output path). Otherwise protonation is left implicit, which is
-    what a SMILES writer wants and avoids hydrogens at bogus positions.
+    When `add_coord_hs` is set (the SDF-output path), explicit hydrogens
+    are added so they appear in the written file. If the input carries a
+    3D conformer they are positioned from the existing geometry while the
+    heavy-atom coordinates are preserved; without coordinates (SMILES
+    input) they are still added explicitly, just without positions.
+    Otherwise (`add_coord_hs` False, the SMILES-output path) protonation
+    is left implicit, which is what a SMILES writer wants and avoids
+    hydrogens at bogus positions.
     """
     from rdkit import Chem
 
@@ -535,13 +546,14 @@ def protonate_molecule(mol, ph, add_coord_hs=True):
         a.SetNoImplicit(True)
     Chem.SanitizeMol(mol_heavy)
 
-    # With 3D coordinates, add explicit hydrogens positioned from the
-    # existing heavy-atom geometry (heavy-atom coordinates are not
-    # modified). Without coordinates, or when the caller doesn't want
-    # them, keep the protonation implicit so a SMILES writer renders it
-    # cleanly without bogus zeroed positions.
-    if has_coords and add_coord_hs:
-        protonated = Chem.AddHs(mol_heavy, addCoords=True)
+    # For SDF output, add explicit hydrogens so they are written to the
+    # file. With 3D coordinates they are positioned from the existing
+    # heavy-atom geometry (heavy-atom coordinates are not modified); with
+    # none (SMILES input) they are added without coordinates. For SMILES
+    # output the caller passes add_coord_hs=False, keeping protonation
+    # implicit so the SMILES writer renders it cleanly.
+    if add_coord_hs:
+        protonated = Chem.AddHs(mol_heavy, addCoords=has_coords)
     else:
         protonated = mol_heavy
 
@@ -576,21 +588,47 @@ def _is_smiles_path(path):
     return path.lower().endswith((".smi", ".smiles"))
 
 
+def _looks_like_smiles_header(line):
+    """
+    True if `line` is a column header (e.g. "SMILES Name") rather than a
+    molecule record -- i.e. its first whitespace-delimited token does not
+    parse as a SMILES. RDKit's error logging is silenced during the probe
+    so the expected parse failure doesn't print a spurious error.
+    """
+    from rdkit import Chem, RDLogger
+
+    token = line.split(None, 1)[0]
+    RDLogger.DisableLog("rdApp.error")
+    try:
+        return Chem.MolFromSmiles(token) is None
+    finally:
+        RDLogger.EnableLog("rdApp.error")
+
+
 def read_molecules(path):
     """
     Yield molecules from `path`, which may be SMILES (.smi/.smiles) or
     SDF. Unparseable entries are yielded as None so callers can count
     and report them. SMILES files are read as one molecule per line,
-    "SMILES [optional name]".
+    "SMILES [optional name]"; an optional leading header line (e.g.
+    "SMILES Name"), recognized by its first token not parsing as a
+    SMILES, is skipped.
     """
     from rdkit import Chem
 
     if _is_smiles_path(path):
         with open(path) as fh:
+            first = True
             for line in fh:
                 line = line.strip()
                 if not line:
                     continue
+                if first:
+                    first = False
+                    # A header line isn't a molecule record; skip it
+                    # silently rather than reporting a parse failure.
+                    if _looks_like_smiles_header(line):
+                        continue
                 parts = line.split(None, 1)
                 mol = Chem.MolFromSmiles(parts[0])
                 if mol is not None and len(parts) > 1:
@@ -851,9 +889,10 @@ def protonate_structure(structure, ligand_res_name=None, ph=7.0, relax=True,
     each hydrogen reordered to immediately follow its bonded heavy atom.
 
     If `ligand_res_name` is given (and not "none"), atoms with that
-    residue name are removed first; a ValueError is raised if no such
-    atoms exist. Any pre-existing hydrogens are stripped before Hydride
-    adds them back.
+    residue name are removed first. Several residues may be removed at
+    once by passing a comma-delimited list (e.g. "EST,CL6"); a ValueError
+    is raised naming any residue name not present in the structure. Any
+    pre-existing hydrogens are stripped before Hydride adds them back.
 
     When `honor_protonation` is True (the default), residues named with a
     force-field protonation/tautomer code -- HID/HIE/HIP (and CHARMM
@@ -868,16 +907,25 @@ def protonate_structure(structure, ligand_res_name=None, ph=7.0, relax=True,
     import biotite.structure as struc
     import hydride
 
-    # Optionally remove the ligand by residue name (3-letter CCD code).
+    # Optionally remove one or more ligands by residue name (3-letter CCD
+    # code). A comma-delimited list removes several at once, e.g. "EST,CL6"
+    # to clear both ligands (and any buffer/ion residues) from a pocket.
     # "none" (any case) means "keep everything".
     if ligand_res_name is not None and ligand_res_name.lower() != "none":
-        target = ligand_res_name.upper()
-        keep_mask = np.char.upper(structure.res_name.astype(str)) != target
-        if keep_mask.all():
+        targets = [
+            name.strip().upper()
+            for name in ligand_res_name.split(",")
+            if name.strip()
+        ]
+        upper_res = np.char.upper(structure.res_name.astype(str))
+        missing = [t for t in targets if not (upper_res == t).any()]
+        if missing:
             raise ValueError(
-                f"No atoms with res_name '{target}' found in structure."
+                "No atoms with res_name "
+                + ", ".join(repr(m) for m in missing)
+                + " found in structure."
             )
-        structure = structure[keep_mask]
+        structure = structure[~np.isin(upper_res, targets)]
 
     # Strip any pre-existing hydrogens; Hydride will add them itself.
     structure = structure[structure.element != "H"]
@@ -971,7 +1019,8 @@ def parse_args():
     prot.add_argument(
         "ligand_res_name",
         help="Residue name of the ligand to remove (e.g. ATP, HEM, AP5). "
-             "Pass 'none' to skip ligand removal.",
+             "Pass a comma-delimited list to remove several at once "
+             "(e.g. 'EST,CL6'), or 'none' to skip ligand removal.",
     )
     prot.add_argument("output", help="Path to the output PDB file")
     prot.add_argument(

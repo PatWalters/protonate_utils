@@ -13,9 +13,18 @@ Runs under pytest, or standalone: ``python test_protonate_utils.py``.
 Requires the ligand extra: ``pip install rdkit dimorphite-dl``.
 """
 
+import os
+import tempfile
+
+import pytest
 from rdkit import Chem
 
-from protonate_utils import _pick_state, protonate_smiles_string
+from protonate_utils import (
+    _pick_state,
+    protonate_ligands,
+    protonate_smiles_string,
+    read_molecules,
+)
 
 
 def _canon(smiles):
@@ -256,6 +265,84 @@ def test_guanidine_is_protonated_end_to_end():
     assert out == _canon("NC(=[NH2+])N/N=C/c1c(Cl)cccc1Cl")
 
 
+def test_read_molecules_skips_smiles_header():
+    # A leading "SMILES Name" header must be detected and skipped, not
+    # reported as an unparseable molecule.
+    with tempfile.TemporaryDirectory() as d:
+        path = os.path.join(d, "in.smi")
+        with open(path, "w") as fh:
+            fh.write("SMILES Name\nCCCN amine\nCCC(=O)O acid\n")
+        mols = list(read_molecules(path))
+    assert all(m is not None for m in mols), "header leaked a None molecule"
+    assert [m.GetProp("_Name") for m in mols] == ["amine", "acid"]
+
+
+def test_read_molecules_keeps_first_molecule_without_header():
+    # No false positive: when the first line is a real molecule it must be
+    # kept, not mistaken for a header.
+    with tempfile.TemporaryDirectory() as d:
+        path = os.path.join(d, "in.smi")
+        with open(path, "w") as fh:
+            fh.write("CCCN amine\nCCC(=O)O acid\n")
+        mols = list(read_molecules(path))
+    assert [m.GetProp("_Name") for m in mols] == ["amine", "acid"]
+
+
+def test_smiles_input_writes_hydrogens_to_sdf():
+    # Regression: SMILES input (no coordinates) written to an SDF must still
+    # carry explicit hydrogens.
+    with tempfile.TemporaryDirectory() as d:
+        in_path = os.path.join(d, "in.smi")
+        out_path = os.path.join(d, "out.sdf")
+        with open(in_path, "w") as fh:
+            fh.write("CCCN amine\n")
+        protonate_ligands(in_path, out_path, ph=7.4)
+        mol = next(Chem.SDMolSupplier(out_path, removeHs=False))
+    n_h = sum(1 for a in mol.GetAtoms() if a.GetSymbol() == "H")
+    # Protonated propylamine CCC[NH3+] has 10 hydrogens.
+    assert n_h == 10, f"expected explicit Hs in SDF, got {n_h}"
+
+
+def test_protein_removes_multiple_ligands():
+    # Comma-delimited residue names remove several ligands at once; a single
+    # name leaves the others in place.
+    pytest.importorskip("biotite")
+    pytest.importorskip("hydride")
+    import biotite.structure.io.pdb as pdb
+
+    from protonate_utils import protonate_structure
+
+    sample = os.path.join(os.path.dirname(__file__), "7axj_protein.pdb")
+    if not os.path.exists(sample):
+        pytest.skip("sample 7axj_protein.pdb not present")
+    structure = pdb.PDBFile.read(sample).get_structure(model=1)
+
+    both = protonate_structure(
+        structure, ligand_res_name="EST,CL6", relax=False
+    )
+    names = set(both.res_name.astype(str))
+    assert "EST" not in names and "CL6" not in names
+
+    one = protonate_structure(structure, ligand_res_name="EST", relax=False)
+    one_names = set(one.res_name.astype(str))
+    assert "EST" not in one_names and "CL6" in one_names
+
+
+def test_protein_missing_ligand_name_raises():
+    pytest.importorskip("biotite")
+    pytest.importorskip("hydride")
+    import biotite.structure.io.pdb as pdb
+
+    from protonate_utils import protonate_structure
+
+    sample = os.path.join(os.path.dirname(__file__), "7axj_protein.pdb")
+    if not os.path.exists(sample):
+        pytest.skip("sample 7axj_protein.pdb not present")
+    structure = pdb.PDBFile.read(sample).get_structure(model=1)
+    with pytest.raises(ValueError, match="ZZZ"):
+        protonate_structure(structure, ligand_res_name="EST,ZZZ", relax=False)
+
+
 if __name__ == "__main__":
     failures = 0
     for name, fn in sorted(globals().items()):
@@ -266,4 +353,6 @@ if __name__ == "__main__":
             except AssertionError as exc:
                 failures += 1
                 print(f"FAIL {name}: {exc}")
+            except pytest.skip.Exception as exc:
+                print(f"SKIP {name}: {exc}")
     raise SystemExit(1 if failures else 0)
