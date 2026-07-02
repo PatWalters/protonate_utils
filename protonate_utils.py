@@ -511,6 +511,59 @@ def _target_atom_states(mol_heavy, ph):
     return out
 
 
+def _repair_missing_protonations(mol, ph):
+    """
+    Protonate aliphatic amines that are basic at `ph` but were left neutral because
+    Dimorphite-DL never enumerated the protonated microstate.
+
+    This is the mirror image of `_repair_illegitimate_ionizations` (which reverts
+    ionizations Dimorphite-DL over-offers). In a peptide the many backbone-amide N-H
+    sites (generic `*Amide`, pKa ~12 with a wide sigma whose lower tail reaches into
+    the physiological window) make Dimorphite-DL emit a deprotonated microstate for
+    each amide, so its enumeration is dominated by net-negative combinations and
+    exhausts the variant budget before the amine-protonation direction is explored --
+    Lys side chains and free N-termini are then never offered protonated.
+    `_pick_state`/repair-down can neutralize the spurious amide anions but cannot
+    *add* a cation that was never enumerated.
+
+    Scope is deliberately narrow -- a primary/secondary/tertiary **aliphatic amine**
+    (pKaH ~10.5): an all-single-bonded nitrogen (which excludes nitrile/imine N),
+    that `_charge_change_is_legitimate` accepts (which excludes amide, acylated/
+    sulfonylated, aniline and cyanamide N), and that is not part of an
+    amidine/guanidine (a neighbouring C=N). Guanidines/amidines are left alone: their
+    high pKa (~12.5) means Dimorphite-DL's `AmidineGuanidine` site already keeps them
+    protonated even in peptides, and touching them here risks the wrong tautomer.
+    The backbone is never charged (amide N is excluded).
+
+    Note: the single aliphatic-amine threshold (~10.5) does not distinguish a free
+    N-terminal alpha-amine (pKaH ~8-9); between ~8 and 10.5 that terminus would be
+    over-protonated. Correct at physiological pH; a group-specific pKa would refine it.
+    """
+    from rdkit import Chem
+
+    if ph is None or ph >= 10.5:
+        return
+    changed = False
+    for a in mol.GetAtoms():
+        if a.GetAtomicNum() != 7 or a.GetFormalCharge() != 0 or a.GetIsAromatic():
+            continue
+        if not _charge_change_is_legitimate(a, 1):        # amide/acyl/aniline/cyanamide -> skip
+            continue
+        if any(b.GetBondType() != Chem.BondType.SINGLE for b in a.GetBonds()):
+            continue                                       # nitrile / imine N -> skip
+        if any(nbr.GetAtomicNum() == 6
+               and any(b.GetBondType() == Chem.BondType.DOUBLE
+                       and b.GetOtherAtom(nbr).GetAtomicNum() == 7 for b in nbr.GetBonds())
+               for nbr in a.GetNeighbors()):
+            continue                                       # amidine/guanidine -> Dimorphite handles it
+        a.SetFormalCharge(1)
+        a.SetNumExplicitHs(a.GetTotalNumHs() + 1)
+        a.SetNoImplicit(True)
+        changed = True
+    if changed:
+        Chem.SanitizeMol(mol)
+
+
 def protonate_molecule(mol, ph, add_coord_hs=True):
     """
     Return a Mol with pH-appropriate protonation.
@@ -545,6 +598,11 @@ def protonate_molecule(mol, ph, add_coord_hs=True):
         a.SetNumExplicitHs(n_hs)
         a.SetNoImplicit(True)
     Chem.SanitizeMol(mol_heavy)
+
+    # Repair-up: add protonations that are unambiguously right at this pH but that
+    # Dimorphite-DL never offered (its variant budget is exhausted by amide-anion
+    # combinatorics in peptides), e.g. Lys/Arg side chains and free N-termini.
+    _repair_missing_protonations(mol_heavy, ph)
 
     # For SDF output, add explicit hydrogens so they are written to the
     # file. With 3D coordinates they are positioned from the existing
