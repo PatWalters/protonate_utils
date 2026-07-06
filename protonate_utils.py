@@ -54,12 +54,36 @@ ligands (EST and CL6) for exercising ligand removal:
 """
 
 import argparse
+import contextlib
 import sys
 
 
 # ---------------------------------------------------------------------------
 # Ligand mode (RDKit + Dimorphite-DL)
 # ---------------------------------------------------------------------------
+
+
+@contextlib.contextmanager
+def _quiet_rdkit_errors():
+    """
+    Silence RDKit's C++ ``rdApp.error`` logger for the duration of the block.
+
+    RDKit writes valence/sanitization complaints (e.g. "Explicit valence for
+    atom # 7 N, 4, is greater than permitted") straight to stderr from its C++
+    core. These fire routinely on inputs RDKit then recovers from anyway -- a
+    nitro group written uncharged as ``N(=O)=O`` logs the error but still parses
+    to ``[N+](=O)[O-]`` -- so the message is noise. Use this only around parse
+    and sanitize calls where we already surface genuine failures ourselves
+    (a ``None`` return or a caught exception reported as ``[warn] skipping``),
+    so no real error is hidden.
+    """
+    from rdkit import RDLogger
+
+    RDLogger.DisableLog("rdApp.error")
+    try:
+        yield
+    finally:
+        RDLogger.EnableLog("rdApp.error")
 
 def _skeleton_copy(mol):
     """
@@ -537,14 +561,19 @@ def protonate_molecule(mol, ph, add_coord_hs=True):
     # molecule. Setting NoImplicit=True with an explicit H count makes
     # the atom state fully determined, which keeps kekulization happy on
     # aromatic heterocycles.
-    new_states = _target_atom_states(mol_heavy, ph)
-    mol_heavy = Chem.RWMol(mol_heavy)
-    for idx, (charge, n_hs) in new_states.items():
-        a = mol_heavy.GetAtomWithIdx(idx)
-        a.SetFormalCharge(charge)
-        a.SetNumExplicitHs(n_hs)
-        a.SetNoImplicit(True)
-    Chem.SanitizeMol(mol_heavy)
+    # RDKit logs valence complaints straight to stderr while parsing
+    # Dimorphite's candidate microstates and while sanitizing the reprotonated
+    # molecule; both are recovered from or reported by us, so quiet the noise
+    # across the whole region.
+    with _quiet_rdkit_errors():
+        new_states = _target_atom_states(mol_heavy, ph)
+        mol_heavy = Chem.RWMol(mol_heavy)
+        for idx, (charge, n_hs) in new_states.items():
+            a = mol_heavy.GetAtomWithIdx(idx)
+            a.SetFormalCharge(charge)
+            a.SetNumExplicitHs(n_hs)
+            a.SetNoImplicit(True)
+        Chem.SanitizeMol(mol_heavy)
 
     # For SDF output, add explicit hydrogens so they are written to the
     # file. With 3D coordinates they are positioned from the existing
@@ -595,14 +624,11 @@ def _looks_like_smiles_header(line):
     parse as a SMILES. RDKit's error logging is silenced during the probe
     so the expected parse failure doesn't print a spurious error.
     """
-    from rdkit import Chem, RDLogger
+    from rdkit import Chem
 
     token = line.split(None, 1)[0]
-    RDLogger.DisableLog("rdApp.error")
-    try:
+    with _quiet_rdkit_errors():
         return Chem.MolFromSmiles(token) is None
-    finally:
-        RDLogger.EnableLog("rdApp.error")
 
 
 def read_molecules(path):
@@ -630,13 +656,16 @@ def read_molecules(path):
                     if _looks_like_smiles_header(line):
                         continue
                 parts = line.split(None, 1)
-                mol = Chem.MolFromSmiles(parts[0])
+                with _quiet_rdkit_errors():
+                    mol = Chem.MolFromSmiles(parts[0])
                 if mol is not None and len(parts) > 1:
                     mol.SetProp("_Name", parts[1].strip())
                 yield mol
     else:
-        for mol in Chem.SDMolSupplier(path, removeHs=False, sanitize=True):
-            yield mol
+        with _quiet_rdkit_errors():
+            supplier = Chem.SDMolSupplier(path, removeHs=False, sanitize=True)
+            for mol in supplier:
+                yield mol
 
 
 def make_writer(path):
